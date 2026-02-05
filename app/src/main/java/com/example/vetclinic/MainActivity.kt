@@ -1,9 +1,13 @@
 package com.example.vetclinic
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,8 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -47,6 +54,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.example.vetclinic.ui.theme.BeigeText
 import com.example.vetclinic.ui.theme.BgBlack
 import com.example.vetclinic.ui.theme.VetclinicTheme
@@ -56,14 +68,24 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-
+            AppNavigation()
         }
     }
 }
 
-@Preview
 @Composable
-fun OpenScreen() {
+fun AppNavigation() {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = "open_screen") {
+        composable("open_screen") { OpenScreen(navController) }
+        composable("add_pet") { AddPet(navController) }
+    }
+}
+
+
+
+@Composable
+fun OpenScreen(navController: NavController) {
     Box(
         Modifier
             .background(BgBlack)
@@ -101,7 +123,7 @@ fun OpenScreen() {
             )
         }
         Button(
-            onClick = { },
+            onClick = { navController.navigate("add_pet") },
             colors = ButtonDefaults.buttonColors(Color.White),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
@@ -120,12 +142,20 @@ fun OpenScreen() {
     }
 }
 
-@Preview
+
+
 @Composable
-fun AddPet() {
+fun AddPet(navController: NavController) {
     var selectedType by remember { mutableStateOf("dog") }
     var name by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        imageUri = uri
+    }
 
     Box(
         Modifier
@@ -156,10 +186,54 @@ fun AddPet() {
 
             Spacer(Modifier.height(30.dp))
 
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF1E1E1E))
+                    .border(
+                        width = 2.dp,
+                        color = Color(0xFF9D7054),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .clickable {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (imageUri != null) {
+                    AsyncImage(
+                        model = imageUri,
+                        contentDescription = "Фото питомца",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Create,
+                            contentDescription = null,
+                            tint = BeigeText,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Добавить фото",
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(30.dp))
+
             Text(
                 text = "Кто у вас?",
                 color = Color.White,
-                fontSize = 24.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.Start)
             )
@@ -199,7 +273,6 @@ fun AddPet() {
                         fontWeight = if (selectedType == "dog") FontWeight.Bold else FontWeight.Normal
                     )
                 }
-
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.clickable { selectedType = "cat" }
@@ -285,9 +358,7 @@ fun AddPet() {
                     singleLine = true
                 )
             }
-
             Spacer(Modifier.height(15.dp))
-
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Возраст",
@@ -332,4 +403,31 @@ fun AddPet() {
             )
         }
     }
+}
+
+@Composable
+fun Profile(navController: NavController) {
+    Box(
+        Modifier
+            .background(BgBlack)
+            .fillMaxSize()
+    ) {}
+}
+
+@Composable
+fun Appointments(navController: NavController) {
+    Box(
+        Modifier
+            .background(BgBlack)
+            .fillMaxSize()
+    ) {}
+}
+
+@Composable
+fun SOS(navController: NavController) {
+    Box(
+        Modifier
+            .background(BgBlack)
+            .fillMaxSize()
+    ) {}
 }
