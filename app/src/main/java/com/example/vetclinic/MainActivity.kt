@@ -2,6 +2,8 @@ package com.example.vetclinic
 
 import android.R.attr.onClick
 import android.R.attr.text
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -70,6 +72,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Warning
@@ -80,11 +83,20 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key.Companion.W
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,87 +107,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-data class BottomNavigationItem(
-    val route: String,
-    val title: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
-)
-
-@Composable
-fun AppNavigation() {
-    val navController = rememberNavController()
-
-    val items = listOf(
-        BottomNavigationItem("profile", "Профиль", Icons.Filled.Home, Icons.Outlined.Home),
-        BottomNavigationItem("appointments", "Записи", Icons.Filled.Create, Icons.Outlined.Create),
-        BottomNavigationItem("sos", "SOS", Icons.Filled.Warning, Icons.Outlined.Warning)
-    )
-
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    val selectedItemIndex by remember(navBackStackEntry) {
-        derivedStateOf {
-            items.indexOfFirst { it.route == currentRoute }
-        }
-    }
-
-    val showBottomBar = currentRoute in items.map { it.route }
-
-    Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar(
-                    containerColor = Color(0xFF1E1E1E),
-                    contentColor = BeigeText,
-                    tonalElevation = 0.dp
-                ) {
-                    items.forEachIndexed { index, item ->
-                        NavigationBarItem(
-                            selected = index == selectedItemIndex,
-                            onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo("open_screen") { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = if (index == selectedItemIndex) {
-                                        item.selectedIcon
-                                    } else {
-                                        item.unselectedIcon
-                                    },
-                                    contentDescription = item.title
-                                )
-                            },
-                            label = { Text(item.title) }
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = "open_screen",
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable("open_screen") { OpenScreen(navController) }
-            composable("add_pet") { AddPet(navController) }
-            composable("profile") { Profile(navController) }
-            composable("appointments") { Appointments(navController) }
-            composable("sos") { SOS(navController) }
-        }
-    }
-}
-
-
-
-
 
 @Composable
 fun OpenScreen(navController: NavController) {
@@ -237,17 +168,37 @@ fun OpenScreen(navController: NavController) {
 
 
 
+
 @Composable
-fun AddPet(navController: NavController) {
+fun AddPet(navController: NavController, petId: Int? = null) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = AppDatabase.getDatabase(context)
+    val dao = db.petDao()
+
     var selectedType by remember { mutableStateOf("dog") }
     var name by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var currentPhotoPath by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(petId) {
+        if (petId != null) {
+            val pet = withContext(Dispatchers.IO) { dao.getPetById(petId) }
+            if (pet != null) {
+                name = pet.name
+                selectedType = pet.selectedType
+                age = pet.age.toString()
+                currentPhotoPath = pet.photoLocation
+            }
+        }
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         imageUri = uri
+        if (uri != null) currentPhotoPath = null
     }
 
     Box(
@@ -299,6 +250,13 @@ fun AddPet(navController: NavController) {
                 if (imageUri != null) {
                     AsyncImage(
                         model = imageUri,
+                        contentDescription = "Фото питомца",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (!currentPhotoPath.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = currentPhotoPath,
                         contentDescription = "Фото питомца",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -461,7 +419,7 @@ fun AddPet(navController: NavController) {
                 )
                 TextField(
                     value = age,
-                    onValueChange = { age = it },
+                    onValueChange = { if (it.all { char -> char.isDigit() }) age = it },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color(0xFF1E1E1E),
                         unfocusedContainerColor = Color(0xFF1E1E1E),
@@ -479,7 +437,42 @@ fun AddPet(navController: NavController) {
         }
 
         Button(
-            onClick = { navController.navigate("profile") },
+            onClick = {
+                scope.launch(Dispatchers.IO) {
+                    var finalPhotoPath = currentPhotoPath
+
+                    if (imageUri != null) {
+                        try {
+                            val inputStream = context.contentResolver.openInputStream(imageUri!!)
+                            val bitmap = BitmapFactory.decodeStream(inputStream)
+                            val fileName = "pet_${System.currentTimeMillis()}.jpg"
+                            val file = File(context.filesDir, fileName)
+                            val outputStream = FileOutputStream(file)
+                            bitmap?.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+                            outputStream.flush()
+                            outputStream.close()
+                            inputStream?.close()
+                            finalPhotoPath = file.absolutePath
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+
+                    val pet = Pet(
+                        id = petId ?: 0,
+                        selectedType = selectedType,
+                        name = name,
+                        age = age.toIntOrNull() ?: 0,
+                        photoLocation = finalPhotoPath
+                    )
+
+                    dao.upsertPet(pet)
+
+                    withContext(Dispatchers.Main) {
+                        navController.navigate("profile")
+                    }
+                }
+            },
             colors = ButtonDefaults.buttonColors(containerColor = Color.White),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
