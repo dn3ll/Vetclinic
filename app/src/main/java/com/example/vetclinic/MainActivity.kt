@@ -1249,6 +1249,7 @@ fun SOS(navController: NavController) {
                     )
                 }
                 Spacer(Modifier.width(8.dp))
+                //ну вроде ок
                 Text(
                     text = if (isSearching) "Идет поиск..." else "Искать ветеринара",
                     color = if (selectedPet != null && description.isNotEmpty()) sosRed else Color.Gray,
