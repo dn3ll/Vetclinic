@@ -47,9 +47,7 @@
 
 ## Архитектура (Clean Architecture + MVVM)
 
-Entity → DAO → ViewModel → UI (Compose)
-↓
-Room Database
+Entity → DAO → ViewModel → UI (Compose) → Room Database
 
 
 ## Технологический стек
