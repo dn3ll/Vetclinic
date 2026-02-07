@@ -4,6 +4,7 @@ import android.R.attr.onClick
 import android.R.attr.text
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.icu.text.SimpleDateFormat
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -74,15 +75,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Create
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -91,12 +110,16 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key.Companion.W
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.intl.Locale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -491,22 +514,583 @@ fun AddPet(navController: NavController, petId: Int? = null) {
     }
 }
 
+
 @Composable
 fun Profile(navController: NavController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = AppDatabase.getDatabase(context)
+    val dao = db.petDao()
+
+    var pets by remember { mutableStateOf<List<Pet>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        dao.getAllPets().collect { list ->
+            pets = list
+        }
+    }
+
     Box(
-        Modifier
+        modifier = Modifier
             .background(BgBlack)
             .fillMaxSize()
-    ) {}
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp, top = 40.dp)
+        ) {
+            Text(
+                text = "Мои питомцы",
+                color = BeigeText,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+
+            if (pets.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Список пуст.\nДобавьте своего первого питомца!",
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(15.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(pets) { pet ->
+                        PetItem(
+                            pet = pet,
+                            onClick = {
+                                navController.navigate("add_pet/${pet.id}")
+                            },
+                            onDelete = {
+                                scope.launch(Dispatchers.IO) {
+                                    dao.deletePet(pet)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = {
+                navController.navigate("add_pet")
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
+                .align(Alignment.BottomCenter)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                tint = Color.Black,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Добавить питомца",
+                color = Color.Black,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
 }
+
+fun getPetTypeInRu(type: String): String {
+    return when (type) {
+        "dog" -> "Собака"
+        "cat" -> "Кошка"
+        "rodent" -> "Грызун"
+        else -> type
+    }
+}
+@Composable
+fun PetItem(pet: Pet, onClick: () -> Unit, onDelete: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+            .clickable { onClick() }
+            .padding(end = 15.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (pet.photoLocation != null) {
+                AsyncImage(
+                    model = pet.photoLocation,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color.Gray)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color.Gray),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🐾", fontSize = 32.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.width(15.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = pet.name,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${getPetTypeInRu(pet.selectedType)}, ${pet.age} лет",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Удалить",
+                tint = Color(0xFFEF5350),
+                modifier = Modifier
+                    .size(30.dp)
+                    .clickable {
+                        onDelete()
+                    }
+                    .padding(5.dp)
+            )
+        }
+    }
+}
+
 
 @Composable
 fun Appointments(navController: NavController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = AppDatabase.getDatabase(context)
+    val appointmentDao = db.appointmentDao()
+    val petDao = db.petDao()
+
+    var appointments by remember { mutableStateOf<List<Appointment>>(emptyList()) }
+    var pets by remember { mutableStateOf<List<Pet>>(emptyList()) }
+
+
+    LaunchedEffect(Unit) {
+        launch {
+            petDao.getAllPets().collect { list -> pets = list }
+        }
+        launch {
+            appointmentDao.getAllAppointments().collect { list -> appointments = list }
+        }
+    }
+
+    var showAddDialog by remember { mutableStateOf(false) }
+
     Box(
-        Modifier
+        modifier = Modifier
             .background(BgBlack)
             .fillMaxSize()
-    ) {}
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 100.dp)
+        ) {
+            Text(
+                text = "Записи на прием",
+                color = BeigeText,
+                fontSize = 38.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 40.dp, bottom = 30.dp)
+            )
+
+            if (appointments.isEmpty()) {
+                // Состояние "Нет записей"
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "У вас пока нет записей",
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                    items(appointments) { appointment ->
+                        val pet = pets.find { it.id == appointment.petId }
+                        AppointmentItem(
+                            petName = pet?.name ?: "Неизвестный питомец",
+                            procedure = appointment.procedure,
+                            doctor = appointment.doctor,
+                            date = appointment.date,
+                            onDelete = {
+                                scope.launch(Dispatchers.IO) {
+                                    appointmentDao.deleteAppointment(appointment)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = {
+                if (pets.isNotEmpty()) {
+                    showAddDialog = true
+                }
+            },
+            enabled = pets.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (pets.isNotEmpty()) Color.White else Color(0xFF333333)
+            ),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp) // Высота как у вас в других экранах
+                .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
+                .align(Alignment.BottomCenter)
+        ) {
+            Text(
+                text = if (pets.isEmpty()) "Сначала добавьте питомца" else "+ Записаться на прием",
+                color = if (pets.isNotEmpty()) Color.Black else Color.Gray,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+
+    if (showAddDialog) {
+        AddAppointmentDialog(
+            pets = pets,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { appointment ->
+                scope.launch(Dispatchers.IO) {
+                    appointmentDao.upsertAppointment(appointment)
+                }
+                showAddDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun AppointmentItem(petName: String, procedure: String, doctor: String, date: Long, onDelete: () -> Unit) {
+    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale("ru", "RU")) }
+    val dateString = dateFormat.format(Date(date))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Без тени для плоского дизайна
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(15.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = petName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = procedure, color = BeigeText, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "Врач: $doctor", color = Color.Gray, fontSize = 14.sp)
+                Text(text = dateString, color = Color(0xFF9D7054), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Удалить",
+                    tint = Color(0xFFEF5350)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddAppointmentDialog(pets: List<Pet>, onDismiss: () -> Unit, onConfirm: (Appointment) -> Unit) {
+    var selectedPet by remember { mutableStateOf<Pet?>(null) }
+    var expandedPet by remember { mutableStateOf(false) }
+
+    var selectedDoctor by remember { mutableStateOf("") }
+    var expandedDoctor by remember { mutableStateOf(false) }
+    val doctors = listOf("Иванов А.А.", "Петрова Б.Б.", "Сидоров В.В.", "Кузнецова Е.Е.")
+
+    var selectedProcedure by remember { mutableStateOf("") }
+    var expandedProcedure by remember { mutableStateOf(false) }
+    val procedures = listOf("Первичный осмотр", "Вакцинация", "Чистка зубов", "Стрижка", "УЗИ")
+
+    var selectedDate by remember { mutableStateOf<Long?>(null) }
+    val datePickerState = rememberDatePickerState()
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color(0xFF2C2C2C)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Новая запись",
+                    color = BeigeText,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 20.dp)
+                )
+
+                Text(text = "Питомец", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(start = 10.dp, bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = expandedPet,
+                    onExpandedChange = { expandedPet = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedPet?.name ?: "Выберите питомца",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = BeigeText) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color(0xFF9D7054),
+                            unfocusedIndicatorColor = Color.DarkGray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color(0xFF9D7054)
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedPet,
+                        onDismissRequest = { expandedPet = false },
+                        containerColor = Color(0xFF3C3C3C)
+                    ) {
+                        pets.forEach { pet ->
+                            DropdownMenuItem(
+                                text = { Text(text = pet.name, color = Color.White) },
+                                onClick = {
+                                    selectedPet = pet
+                                    expandedPet = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+
+                Text(text = "Процедура", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(start = 10.dp, bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = expandedProcedure,
+                    onExpandedChange = { expandedProcedure = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedProcedure.ifEmpty { "Выберите процедуру" },
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = BeigeText) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color(0xFF9D7054),
+                            unfocusedIndicatorColor = Color.DarkGray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color(0xFF9D7054)
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedProcedure,
+                        onDismissRequest = { expandedProcedure = false },
+                        containerColor = Color(0xFF3C3C3C)
+                    ) {
+                        procedures.forEach { procedure ->
+                            DropdownMenuItem(
+                                text = { Text(text = procedure, color = Color.White) },
+                                onClick = {
+                                    selectedProcedure = procedure
+                                    expandedProcedure = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+
+                Text(text = "Врач", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(start = 10.dp, bottom = 8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = expandedDoctor,
+                    onExpandedChange = { expandedDoctor = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedDoctor.ifEmpty { "Выберите врача" },
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = BeigeText) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color(0xFF9D7054),
+                            unfocusedIndicatorColor = Color.DarkGray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color(0xFF9D7054)
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedDoctor,
+                        onDismissRequest = { expandedDoctor = false },
+                        containerColor = Color(0xFF3C3C3C)
+                    ) {
+                        doctors.forEach { doctor ->
+                            DropdownMenuItem(
+                                text = { Text(text = doctor, color = Color.White) },
+                                onClick = {
+                                    selectedDoctor = doctor
+                                    expandedDoctor = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                Text(text = "Дата", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(start = 10.dp, bottom = 8.dp))
+
+                Box(Modifier.fillMaxWidth()) {
+
+                    OutlinedTextField(
+                        value = selectedDate?.let {
+                            SimpleDateFormat("dd MMM yyyy", java.util.Locale("ru", "RU")).format(Date(it))
+                        } ?: "Выберите дату",
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = false, // важно
+                        trailingIcon = { Icon(Icons.Default.DateRange, null, tint = BeigeText) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            disabledContainerColor = Color.Transparent,
+                            disabledIndicatorColor = Color.DarkGray,
+                            disabledTextColor = Color.White,
+                            disabledTrailingIconColor = BeigeText,
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showDatePicker = true }
+                    )
+                }
+
+
+                Spacer(modifier = Modifier.height(30.dp))
+
+
+                Button(
+                    onClick = {
+                        if (selectedPet != null && selectedProcedure.isNotEmpty() && selectedDoctor.isNotEmpty() && selectedDate != null) {
+                            val finalDate = selectedDate!! + (12 * 60 * 60 * 1000)
+                            onConfirm(
+                                Appointment(
+                                    petId = selectedPet!!.id,
+                                    doctor = selectedDoctor,
+                                    procedure = selectedProcedure,
+                                    date = finalDate
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Сохранить", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDatePicker = false
+                        datePickerState.selectedDateMillis?.let {
+                            selectedDate = it
+                        }
+                    }
+                ) { Text("OK", color = Color(0xFF9D7054)) }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 @Composable

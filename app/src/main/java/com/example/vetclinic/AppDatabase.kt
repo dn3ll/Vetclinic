@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Pet::class], version = 1)
+@Database(entities = [Pet::class, Appointment::class], version = 2)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun petDao(): PetDao
+    abstract fun appointmentDao(): AppointmentDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -18,7 +19,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "vetclinic_database"
-                ).build()
+                ).fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

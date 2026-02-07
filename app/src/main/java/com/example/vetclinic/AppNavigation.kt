@@ -15,11 +15,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -28,9 +30,17 @@ import androidx.navigation.compose.rememberNavController
 import com.example.vetclinic.ui.theme.BeigeText
 import kotlin.collections.contains
 
+
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+
+    val db = AppDatabase.getDatabase(context)
+    val dao = db.petDao()
+
+    val pets by dao.getAllPets().collectAsState(initial = emptyList())
+    val startDestination = if (pets.isEmpty()) "open_screen" else "profile"
 
     val items = listOf(
         BottomNavigationItem("profile", "Профиль", Icons.Filled.Home, Icons.Outlined.Home),
@@ -87,14 +97,22 @@ fun AppNavigation() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "open_screen",
+            startDestination = startDestination, // Используем динамический стартовый экран
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("open_screen") { OpenScreen(navController) }
+
             composable("add_pet") { AddPet(navController) }
+
+            composable("add_pet/{petId}") { backStackEntry ->
+                val petId = backStackEntry.arguments?.getString("petId")?.toIntOrNull()
+                AddPet(navController, petId)
+            }
+
             composable("profile") { Profile(navController) }
             composable("appointments") { Appointments(navController) }
             composable("sos") { SOS(navController) }
         }
     }
 }
+
