@@ -13,3 +13,5 @@ val Pink40 = Color(0xFF7D5260)
 val BgBlack = Color(0xFF181c2d)
 
 val BeigeText = Color(0xFFf8fcf9)
+
+val sosRed = Color(0xFFE53935)

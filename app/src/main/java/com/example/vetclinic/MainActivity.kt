@@ -1,18 +1,18 @@
 package com.example.vetclinic
 
-import android.R.attr.onClick
-import android.R.attr.text
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.icu.text.SimpleDateFormat
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,13 +36,11 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ComposeCompilerApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,25 +53,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.vetclinic.ui.theme.BeigeText
 import com.example.vetclinic.ui.theme.BgBlack
-import com.example.vetclinic.ui.theme.VetclinicTheme
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -81,39 +67,24 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Create
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key.Companion.W
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.view.WindowCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -736,7 +707,7 @@ fun Appointments(navController: NavController) {
             )
 
             if (appointments.isEmpty()) {
-                // Состояние "Нет записей"
+
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -780,7 +751,7 @@ fun Appointments(navController: NavController) {
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp) // Высота как у вас в других экранах
+                .height(80.dp)
                 .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
                 .align(Alignment.BottomCenter)
         ) {
@@ -816,7 +787,7 @@ fun AppointmentItem(petName: String, procedure: String, doctor: String, date: Lo
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Без тени для плоского дизайна
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -1026,7 +997,7 @@ fun AddAppointmentDialog(pets: List<Pet>, onDismiss: () -> Unit, onConfirm: (App
                         } ?: "Выберите дату",
                         onValueChange = {},
                         readOnly = true,
-                        enabled = false, // важно
+                        enabled = false,
                         trailingIcon = { Icon(Icons.Default.DateRange, null, tint = BeigeText) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = TextFieldDefaults.colors(
@@ -1093,11 +1064,198 @@ fun AddAppointmentDialog(pets: List<Pet>, onDismiss: () -> Unit, onConfirm: (App
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SOS(navController: NavController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = AppDatabase.getDatabase(context)
+    val dao = db.petDao()
+
+    var pets by remember { mutableStateOf<List<Pet>>(emptyList()) }
+    var selectedPet by remember { mutableStateOf<Pet?>(null) }
+    var expandedPet by remember { mutableStateOf(false) }
+    var description by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+
+    val sosRed = Color(0xFFE53935)
+
+    LaunchedEffect(Unit) {
+        dao.getAllPets().collect { list -> pets = list }
+    }
+
     Box(
-        Modifier
+        modifier = Modifier
             .background(BgBlack)
             .fillMaxSize()
-    ) {}
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 40.dp, top = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(40.dp))
+
+            Text(
+                text = "Экстренная помощь",
+                color = BeigeText,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            Text(
+                text = "Кнопка экстренной помощи вашему питомцу. Напишите что случилось и мы подберем ближайшего ветеринара.",
+                color = Color.Gray,
+                fontSize = 16.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(40.dp))
+
+            Text(
+                text = "Выберите питомца",
+                color = BeigeText,
+                fontSize = 16.sp,
+                modifier = Modifier
+                    .align(Alignment.Start)
+                    .padding(start = 10.dp, bottom = 8.dp)
+            )
+
+            ExposedDropdownMenuBox(
+                expanded = expandedPet,
+                onExpandedChange = { expandedPet = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = selectedPet?.name ?: "Питомец не выбран",
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = BeigeText) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color(0xFF9D7054),
+                        unfocusedIndicatorColor = Color.DarkGray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color(0xFF9D7054)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedPet,
+                    onDismissRequest = { expandedPet = false },
+                    containerColor = Color(0xFF3C3C3C),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (pets.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Нет питомцев", color = Color.Gray) },
+                            onClick = { expandedPet = false },
+                            enabled = false
+                        )
+                    } else {
+                        pets.forEach { pet ->
+                            DropdownMenuItem(
+                                text = { Text(text = pet.name, color = Color.White) },
+                                onClick = {
+                                    selectedPet = pet
+                                    expandedPet = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(25.dp))
+
+            Text(
+                text = "Описание ситуации",
+                color = BeigeText,
+                fontSize = 16.sp,
+                modifier = Modifier
+                    .align(Alignment.Start)
+                    .padding(start = 10.dp, bottom = 8.dp)
+            )
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                placeholder = { Text("Опишите симптомы или ситуацию...", color = Color.Gray) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color(0xFF9D7054),
+                    unfocusedIndicatorColor = Color.DarkGray,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color(0xFF9D7054)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                maxLines = 5
+            )
+
+            Spacer(Modifier.height(40.dp))
+
+            Button(
+                onClick = {
+                    if (selectedPet != null && description.isNotEmpty()) {
+                        isSearching = true
+                        scope.launch {
+                            kotlinx.coroutines.delay(3000)
+                            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                isSearching = false
+                                Toast.makeText(context, "Ветеринар найден!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        Toast.makeText(context, "Выберите питомца и опишите проблему", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = !isSearching && selectedPet != null && description.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent
+                ),
+                border = BorderStroke(2.dp, if (selectedPet != null && description.isNotEmpty()) sosRed else Color.DarkGray),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+            ) {
+                if (isSearching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = sosRed,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = if (selectedPet != null && description.isNotEmpty()) sosRed else Color.Gray,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (isSearching) "Идет поиск..." else "Искать ветеринара",
+                    color = if (selectedPet != null && description.isNotEmpty()) sosRed else Color.Gray,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
 }
