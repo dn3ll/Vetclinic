@@ -696,7 +696,7 @@ fun Appointments(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 100.dp)
+                .padding(bottom = 100.dp, top = 20.dp)
         ) {
             Text(
                 text = "Записи на прием",
